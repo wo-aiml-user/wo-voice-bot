@@ -1,0 +1,15 @@
+venv/
+.env
+myenv/
+env/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+.qoder/
+logs/
+uploads/
+node_modules/
+rag_worker.lock
+data_scraping_pipeline/sitemaps/
+data_scraping_pipeline/page_contents/
