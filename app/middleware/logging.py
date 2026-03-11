@@ -1,26 +1,33 @@
-import time
 from loguru import logger
 from fastapi import Request
 
+
 async def log_requests_middleware(request: Request, call_next):
-    """Middleware to log the full API request with execution time"""
+    """Middleware to log API request lifecycle with execution time."""
+    request_body = ""
 
-    start_time = time.time()
-    request_body = None
     if request.method in ("POST", "PUT", "PATCH"):
-        request_body = await request.body()
+        raw_body = await request.body()
         try:
-            request_body = request_body.decode("utf-8")
+            request_body = raw_body.decode("utf-8")
         except Exception:
-            request_body = str(request_body)
-    else:
-        request_body = ""
+            request_body = str(raw_body)
 
-    # logger.info(
-    #         f"Request: {request.method} {request.url.path} | Body: {request_body}"
-    #     )
+    logger.info(
+        f"[REQUEST_MIDDLEWARE] Incoming request | method={request.method} path={request.url.path} "
+        f"query={request.url.query} body_len={len(request_body)}"
+    )
 
-    response = await call_next(request)
-    duration = (time.time() - start_time) * 1000
-    logger.info(f"API: {request.method} {request.url.path} | Status: {response.status_code} | Time: {duration:.2f}ms")
-    return response
+    try:
+        response = await call_next(request)
+        logger.info(
+            f"[REQUEST_MIDDLEWARE] Completed request | method={request.method} "
+            f"path={request.url.path} status={response.status_code}"
+        )
+        return response
+    except Exception as e:
+        logger.exception(
+            f"[REQUEST_MIDDLEWARE] Request failed | method={request.method} "
+            f"path={request.url.path} error={str(e)}"
+        )
+        raise

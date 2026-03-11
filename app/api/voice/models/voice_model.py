@@ -29,8 +29,8 @@ class VoiceAgentConfig(BaseModel):
     language: str = Field(default="en", description="Language for the agent")
     stt_model: str = Field(default="nova-3", description="Speech-to-text model")
     tts_model: str = Field(default="aura-2-thalia-en", description="Text-to-speech model")
-    llm_model: str = Field(default="deepseek-chat", description="LLM model name")
-    temperature: float = Field(default=0.4, description="LLM temperature")
+    llm_model: str = Field(default="gemini-2.5-flash", description="LLM model name")
+    temperature: float = Field(default=0.6, description="LLM temperature")
     greeting: Optional[str] = Field(
         default="Hello! How can I help you today?",
         description="Initial greeting message"

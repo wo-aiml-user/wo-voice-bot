@@ -13,8 +13,6 @@ class TokenRequest(BaseModel):
     def validate_user_id(cls, v: str) -> str:
         if not v.strip():
             raise ValueError('user_id cannot be empty or whitespace')
-        if not v.isalnum():
-            raise ValueError('user_id must be alphanumeric')
         return v
 
 class TokenResponse(BaseModel):

@@ -14,14 +14,15 @@ PUBLIC_PATHS = [
     "/health",  # Health check endpoint
 ]
 
+
 class JWTAuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: FastAPI, exclude_paths=None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or PUBLIC_PATHS
-        self.valid_routes = None  # Initialize as None
+        self.valid_routes = None
 
     def get_valid_routes(self, app: FastAPI):
-        """ Extract all (path, method) pairs after app is fully initialized. """
+        """Extract all (path, method) pairs after app is fully initialized."""
         if self.valid_routes is None:
             self.valid_routes = set()
             for route in app.router.routes:
@@ -33,33 +34,38 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         request_path = request.url.path
         request_method = request.method
+        logger.info(f"[JWT_MIDDLEWARE] Dispatch start | method={request_method} path={request_path}")
 
         # Ensure routes are extracted after app initialization
         valid_routes = self.get_valid_routes(request.app)
+        logger.debug(f"[JWT_MIDDLEWARE] Valid routes cached={len(valid_routes)}")
 
-        # Check if the route exists with the correct method
+        # If route does not match exactly, let FastAPI handle 404/405 naturally.
         if (request_path, request_method) not in valid_routes:
-            # Check if the path exists but method is incorrect → 405
             if any(request_path == path for path, _ in valid_routes):
-                return await call_next(request)
-            # Otherwise, the route does not exist → 404
+                logger.info(f"[JWT_MIDDLEWARE] Route found with different method | path={request_path} method={request_method}")
+            else:
+                logger.info(f"[JWT_MIDDLEWARE] Route not found | path={request_path} method={request_method}")
             return await call_next(request)
 
         # Allow public paths without authentication
-        if any(request.url.path.startswith(path) for path in self.exclude_paths):
+        if any(request_path.startswith(path) for path in self.exclude_paths):
+            logger.info(f"[JWT_MIDDLEWARE] Public path bypass | path={request_path}")
             return await call_next(request)
 
-        # Get Authorization header
+        # Validate Bearer token format and decode token.
         auth_header = request.headers.get("Authorization")
-        # Validate Bearer token format
+        logger.debug(f"[JWT_MIDDLEWARE] Authorization header present={bool(auth_header)}")
+
         try:
             user_id = JWTAuth.verify_token(auth_header)
-            # Store the jwt_payload in the request state
-            request.state.user_id = user_id
-            return await call_next(request)  # Continue processing
         except HTTPException as e:
-            logger.error(f"JWT validation error: {str(e)}")
-            return error_response(str(e.detail), e.status_code)
+            logger.error(f"[JWT_MIDDLEWARE] JWT validation error | detail={str(e.detail)} status={e.status_code}")
+            return await error_response(str(e.detail), e.status_code)
         except Exception as e:
-            logger.error(f"Unexpected error in JWT middleware: {str(e)}")
-            return error_response("Internal server error", 500)
+            logger.exception(f"[JWT_MIDDLEWARE] Unexpected JWT verification error | error={str(e)}")
+            return await error_response("Internal server error", 500)
+
+        request.state.user_id = user_id
+        logger.info(f"[JWT_MIDDLEWARE] Authenticated user | user_id={user_id}")
+        return await call_next(request)

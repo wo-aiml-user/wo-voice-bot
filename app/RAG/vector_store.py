@@ -192,7 +192,7 @@ async def get_vector_store(collection_name: str = None, embedding_model=None) ->
         if embedding_model is None:
             embedding_model = CustomVoyageAIEmbeddings(
                 model=settings.VOYAGE_MODELS['embedding'],
-                api_key=settings.VOYAGE_API_KEY,  # Pass API key explicitly
+                api_key=settings.VOYAGE_API_KEY,
                 show_progress_bar=True,
                 batch_size=128,
                 truncation=True,
