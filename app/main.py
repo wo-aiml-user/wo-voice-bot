@@ -9,7 +9,8 @@ from app.logger import setup_logger
 from app.RAG.vector_store import (
     connect_to_mongodb, disconnect_from_mongodb,
 )
-import asyncio, os, socket
+import os
+import socket
 from filelock import FileLock, Timeout
 
 LOCK_FILE = os.path.join(tempfile.gettempdir(), "rag_worker.lock")
@@ -31,13 +32,13 @@ async def lifespan(app: FastAPI):
             logger.warning(f"Failed to write lock file: {e}")
 
         # primary initialisation
-        connect_to_mongodb()
+        await connect_to_mongodb()
         # app.state.sqs_task = asyncio.create_task(consume_forever())
 
     except Timeout:
         is_primary = False
         logger.info(f"{hostname}:{worker_id} is SECONDARY (lock busy)")
-        connect_to_mongodb()
+        await connect_to_mongodb()
 
     # ── FastAPI runs ────────────────────────────────────────────
     yield
@@ -60,7 +61,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Secondary shutting down")
 
-    disconnect_from_mongodb()
+    await disconnect_from_mongodb()
     logger.info("RAG system disconnected")
 
 
@@ -68,6 +69,5 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
 setup_logger(settings)
-app.state.config = settings
 setup_middlewares(app)
 setup_routes(app)

@@ -2,7 +2,7 @@ import re
 import json
 from loguru import logger
 
-def clean_json_string(json_str):
+async def clean_json_string(json_str):
     """Clean and normalize JSON string before parsing"""
 
     # Remove any markdown code block markers
@@ -17,11 +17,14 @@ def clean_json_string(json_str):
     json_str = re.sub(r'([,{])\s*"([^"]+)":\s*"(yes|no)"', lambda m: f'{m.group(1)} "{m.group(2)}": {m.group(3).lower()}', json_str, flags=re.IGNORECASE)  # Full key-value pairs
     
     # Fix list formatting issues
-    json_str = re.sub(r'\[([^\]]*?)\]', lambda m: normalize_list_string(m.group(1)), json_str)
+    list_matches = list(re.finditer(r'\[([^\]]*?)\]', json_str))
+    for match in list_matches:
+        normalized = await normalize_list_string(match.group(1))
+        json_str = json_str.replace(match.group(0), normalized, 1)
     
     return json_str.strip()
 
-def normalize_list_string(list_str):
+async def normalize_list_string(list_str):
     """Normalize the format of list strings"""
     if not list_str.strip():
         return '[]'
@@ -41,23 +44,23 @@ def normalize_list_string(list_str):
     
     return f'[{",".join(normalized)}]'
 
-def parse_json_response(response_string):
+async def parse_json_response(response_string):
     """Parse JSON response with robust error handling"""
     try:
         # First try direct JSON parsing
         return json.loads(response_string)
     except json.JSONDecodeError:
         # Clean and try again
-        cleaned_json = clean_json_string(response_string)
+        cleaned_json = await clean_json_string(response_string)
         try:
             return json.loads(cleaned_json)
-        except json.JSONDecodeError as e:
-            logger.info(f"Normal JSON parsing failed and we are going with regex function")
+        except json.JSONDecodeError:
+            logger.info("Normal JSON parsing failed and we are going with regex function")
             # Fall back to regex-based parsing for specific fields
-            return extract_fields_with_regex(response_string)
+            return await extract_fields_with_regex(response_string)
 
 
-def extract_fields_with_regex(text):
+async def extract_fields_with_regex(text):
     """Extract fields using regex as a last resort"""
     result = {
         "ai": "",

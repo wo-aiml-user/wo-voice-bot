@@ -5,7 +5,8 @@ Simplified version for RAG chat retrieval operations only.
 from loguru import logger
 from typing import Optional
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, OperationFailure
+from pymongo.operations import SearchIndexModel
 from langchain_mongodb import MongoDBAtlasVectorSearch
 from app.config import settings
 from app.RAG.embedding import CustomVoyageAIEmbeddings
@@ -24,7 +25,7 @@ class MongoDBCollectionError(Exception):
     pass
 
 
-def connect_to_mongodb() -> bool:
+async def connect_to_mongodb() -> bool:
     """
     Connect to MongoDB Atlas.
     
@@ -58,7 +59,7 @@ def connect_to_mongodb() -> bool:
         raise MongoDBConnectionError(error_msg) from e
 
 
-def disconnect_from_mongodb() -> bool:
+async def disconnect_from_mongodb() -> bool:
     """
     Disconnect from MongoDB Atlas.
     
@@ -79,7 +80,7 @@ def disconnect_from_mongodb() -> bool:
         return False
 
 
-def is_connected() -> bool:
+async def is_connected() -> bool:
     """Check if connected to MongoDB."""
     global _mongo_client
     
@@ -93,20 +94,65 @@ def is_connected() -> bool:
         return False
 
 
-def ensure_connected():
+async def ensure_connected():
     """Ensure connection to MongoDB exists."""
-    if not is_connected():
+    if not await is_connected():
         raise MongoDBConnectionError("Not connected to MongoDB. Call connect_to_mongodb first.")
 
 
-def get_collection():
+async def ensure_collection_and_index(collection_name: str = None):
+    """Ensure the target collection and its vector search index exist."""
+    await ensure_connected()
+    col_name = collection_name or settings.MONGODB_COLLECTION_NAME
+    db = _mongo_client[settings.MONGODB_DB_NAME]
+    
+    # 1. Create collection if it doesn't exist
+    if col_name not in db.list_collection_names():
+        logger.info(f"[MongoDB] Collection '{col_name}' does not exist. Creating it...")
+        db.create_collection(col_name)
+    
+    collection = db[col_name]
+    index_name = settings.MONGODB_INDEX_NAME
+    
+    # 2. Check and create vector search index if it doesn't exist
+    try:
+        # PyMongo >= 4.7 supports list_search_indexes()
+        existing_indexes = list(collection.list_search_indexes())
+        index_names = [idx.get("name") for idx in existing_indexes]
+        
+        if index_name not in index_names:
+            logger.info(f"[MongoDB] Vector search index '{index_name}' missing. Creating it...")
+            search_index_model = SearchIndexModel(
+                definition={
+                    "fields": [
+                        {
+                            "type": "vector",
+                            "numDimensions": 1024,  # Default matching VoyageAI 1024
+                            "path": "embedding",
+                            "similarity": "cosine"
+                        }
+                    ]
+                },
+                name=index_name,
+                type="vectorSearch"
+            )
+            # Create the index (Atlas specific, may take a few minutes to be ready)
+            collection.create_search_index(model=search_index_model)
+            logger.info(f"[MongoDB] Vector search index '{index_name}' creation initiated.")
+    except OperationFailure as e:
+        logger.warning(f"[MongoDB] Could not verify/create search index (might not be running on Atlas or lacking permissions): {e}")
+    except Exception as e:
+        logger.warning(f"[MongoDB] Error checking search index: {e}")
+
+
+async def get_collection():
     """Get the MongoDB collection for documents."""
-    ensure_connected()
+    await ensure_collection_and_index()
     db = _mongo_client[settings.MONGODB_DB_NAME]
     return db[settings.MONGODB_COLLECTION_NAME]
 
 
-def collection_in_db(collection_name: str = None) -> bool:
+async def collection_in_db(collection_name: str = None) -> bool:
     """
     Checks if the collection exists in the database.
     
@@ -118,7 +164,7 @@ def collection_in_db(collection_name: str = None) -> bool:
         bool: True if collection exists, False otherwise.
     """
     try:
-        ensure_connected()
+        await ensure_connected()
         coll_name = collection_name or settings.MONGODB_COLLECTION_NAME
         db = _mongo_client[settings.MONGODB_DB_NAME]
         return coll_name in db.list_collection_names()
@@ -127,7 +173,7 @@ def collection_in_db(collection_name: str = None) -> bool:
         return False
 
 
-def get_vector_store(collection_name: str = None, embedding_model=None) -> MongoDBAtlasVectorSearch:
+async def get_vector_store(collection_name: str = None, embedding_model=None) -> MongoDBAtlasVectorSearch:
     """
     Creates a LangChain MongoDB Atlas Vector Search store for retrieval.
 
@@ -139,7 +185,7 @@ def get_vector_store(collection_name: str = None, embedding_model=None) -> Mongo
         MongoDBAtlasVectorSearch: LangChain MongoDBAtlasVectorSearch instance.
     """
     try:
-        ensure_connected()
+        await ensure_collection_and_index(collection_name)
         
         coll_name = collection_name or settings.MONGODB_COLLECTION_NAME
             

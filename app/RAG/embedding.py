@@ -1,6 +1,5 @@
-from loguru import logger
 from pydantic import PrivateAttr
-from typing import List, cast, Iterable
+from typing import List, cast
 from langchain_voyageai import VoyageAIEmbeddings
 
 class CustomVoyageAIEmbeddings(VoyageAIEmbeddings):

@@ -1,9 +1,6 @@
 from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings
-import logging
-import os
-
 
 class Settings(BaseSettings):
     # Base configuration

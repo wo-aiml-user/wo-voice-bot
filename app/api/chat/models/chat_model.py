@@ -1,6 +1,5 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import List, Optional, Dict, Any, Self
-
+from pydantic import BaseModel, Field, field_validator
+from typing import Dict
 class ChatMessage(BaseModel):
     """
     Represents a single message in the chat history.
@@ -21,8 +20,6 @@ class ChatRequest(BaseModel):
     Defines the structure for a chat request.
     """
     user_query: str = Field(..., description="The user's question or message.", min_length=1)
-    file_ids: Optional[List[str]] = Field(None, description="A list of specific file IDs to search within.")
-
     @field_validator('user_query')
     @classmethod
     def user_query_cannot_be_empty(cls, v: str) -> str:
@@ -30,17 +27,6 @@ class ChatRequest(BaseModel):
         if not v.strip():
             raise ValueError("user_query cannot be empty or contain only whitespace.")
         return v
-
-class MetaData(BaseModel):
-    """
-    Defines the structure for metadata associated with a chat response.
-    """
-    text: str
-    page_number: Any
-    file_id: str
-    file_name: str
-    file_path: str
-
 
 class ChatResponse(BaseModel):
     """

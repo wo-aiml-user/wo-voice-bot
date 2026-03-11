@@ -2,7 +2,7 @@
 RAG chain implementation using DeepSeek with optimized single LLM call.
 Handles tool calling intelligently with proper context formatting and token tracking.
 """
-from typing import Dict, Any
+from typing import Dict
 from app.RAG.gemini_client import GeminiClient
 from app.RAG.prompt import get_voice_prompt
 from app.config import Settings
@@ -39,7 +39,7 @@ async def execute_rag_chain(request: ChatRequest, collection_name: str, settings
     messages = [
         {
             "role": "system",
-            "content": get_voice_prompt()
+            "content": await get_voice_prompt()
         },
         {
             "role": "user",
@@ -87,7 +87,7 @@ async def execute_rag_chain(request: ChatRequest, collection_name: str, settings
             logger.info(f"[RAG_CHAIN] Tool arguments: {function_args}")
             
             # Execute the tool and get result, context, and token usage
-            tool_result, tool_context, tool_tokens = execute_tool(
+            tool_result, tool_context, tool_tokens = await execute_tool(
                 function_name=function_name,
                 function_args=function_args,
                 collection_name=collection_name

@@ -8,10 +8,9 @@ from typing import List, Dict, Optional, Any
 from dotenv import load_dotenv
 from loguru import logger
 from pymongo import MongoClient
-from google import genai
-from google.genai import types
+from app.RAG.embedding import CustomVoyageAIEmbeddings
 from app.config import settings
-
+from app.RAG.vector_store import ensure_collection_and_index
 load_dotenv()
 
 class Document:
@@ -21,9 +20,9 @@ class Document:
 
 
 
-def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 5) -> tuple[List[Document], Dict[str, int]]:
+async def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 5) -> tuple[List[Document], Dict[str, int]]:
     """
-    Retrieve documents from MongoDB Atlas Vector Search using vanilla genai and pymongo.
+    Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo.
     """
     token_usage = {"embedding_tokens": 0, "retrieval_tokens": 0}
     
@@ -35,25 +34,23 @@ def retrieve_documents(query: str, collection_name: Optional[str] = None, file_i
     
     if not mongo_uri:
         logger.error("[RAG] MONGODB_URI is not set")
-        return [], token_usage
-    
     try:
+        await ensure_collection_and_index(col_name)
+        
         client = MongoClient(mongo_uri)
         collection = client[db_name][col_name]
         
-        # Get embeddings from Gemini
-        genai_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        
-        logger.info(f"[RAG] Generating embedding for query: {query}")
-        embed_response = genai_client.models.embed_content(
-            model="text-embedding-004",
-            contents=query,
-            config=types.EmbedContentConfig(
-                task_type="RETRIEVAL_QUERY",
-            )
+        # Get embeddings from Voyage AI
+        embedder = CustomVoyageAIEmbeddings(
+            model=settings.VOYAGE_MODELS.get('embedding', 'voyage-3-large'),
+            voyage_api_key=settings.VOYAGE_API_KEY,
+            truncation=True,
+            output_dimension=1024
         )
         
-        query_vector = embed_response.embeddings[0].values
+        logger.info(f"[RAG] Generating embedding for query: {query}")
+        query_vector = embedder.embed_query(query)
+        token_usage["embedding_tokens"] = embedder.get_total_tokens()
         
         # Perform Vector Search query
         pipeline = [
@@ -94,14 +91,14 @@ def retrieve_documents(query: str, collection_name: Optional[str] = None, file_i
         logger.error(f"[RAG] Document retrieval failed: {e}")
         return [], token_usage
 
-def format_documents_for_llm(documents: List[Document]) -> str:
+async def format_documents_for_llm(documents: List[Document]) -> str:
     """Format the retrieved documents to pass to LLM as string."""
     formatted_docs = []
     for doc in documents:
         formatted_docs.append(f"FileName: {doc.metadata.get('file_name', 'Unknown')}\nContent: {doc.page_content}")
     return "\n\n".join(formatted_docs)
 
-def execute_tool(function_name: str, function_args: Dict, collection_name: Optional[str] = None) -> tuple[str, Any, Dict[str, int]]:
+async def execute_tool(function_name: str, function_args: Dict, collection_name: Optional[str] = None) -> tuple[str, Any, Dict[str, int]]:
     """
     Execute a tool function by name and return result with token usage.
     """
@@ -123,7 +120,7 @@ def execute_tool(function_name: str, function_args: Dict, collection_name: Optio
             
             logger.info(f"[TOOL_EXEC] Retrieving documents for query: '{query}'")
             
-            documents, retrieval_tokens = retrieve_documents(
+            documents, retrieval_tokens = await retrieve_documents(
                 query=query,
                 collection_name=collection_name,
                 file_ids=file_ids
@@ -131,7 +128,7 @@ def execute_tool(function_name: str, function_args: Dict, collection_name: Optio
             
             token_usage.update(retrieval_tokens)
             
-            result = format_documents_for_llm(documents)
+            result = await format_documents_for_llm(documents)
             logger.info(f"[TOOL_EXEC] Retrieved {len(documents)} documents | tokens={retrieval_tokens}")
             
             return result, documents, token_usage

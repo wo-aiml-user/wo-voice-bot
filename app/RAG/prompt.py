@@ -1,4 +1,4 @@
-def get_voice_prompt():
+async def get_voice_prompt(template_type="standard"):
     base_template = """
     # Webosmotic Chatbot System Prompt
 

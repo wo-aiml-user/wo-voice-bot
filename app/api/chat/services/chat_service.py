@@ -21,11 +21,11 @@ async def get_chat_response(request: ChatRequest, settings: Settings) -> Dict:
     Returns:
         Chat response with answer and token usage
     """
-    logger.info(f"[CHAT_SERVICE] Processing chat request")
+    logger.info("[CHAT_SERVICE] Processing chat request")
     logger.info(f"[CHAT_SERVICE] User query: {request.user_query}")
     
-    # Use fixed collection name
-    collection_name = "tool_calling_dev"
+    # Use fixed collection name from config
+    collection_name = settings.MONGODB_COLLECTION_NAME
     
     logger.info(f"[CHAT_SERVICE] Using collection: {collection_name}")
     
@@ -36,7 +36,7 @@ async def get_chat_response(request: ChatRequest, settings: Settings) -> Dict:
         settings=settings
     )
     
-    logger.info(f"[CHAT_SERVICE] RAG chain execution complete")
+    logger.info("[CHAT_SERVICE] RAG chain execution complete")
     
     # Adapt response for formatter (it expects 'answer' key)
     if "response" in rag_response:
@@ -47,10 +47,10 @@ async def get_chat_response(request: ChatRequest, settings: Settings) -> Dict:
     logger.info(f"[CHAT_SERVICE] Tool names: {rag_response.get('tool_names', [])}")
     
     # Format and clean the response
-    formatted_response = format_rag_response(
+    formatted_response = await format_rag_response(
         response=rag_response,
         user_query=request.user_query
     )
     
-    logger.info(f"[CHAT_SERVICE] Response generated and formatted successfully")
+    logger.info("[CHAT_SERVICE] Response generated and formatted successfully")
     return formatted_response

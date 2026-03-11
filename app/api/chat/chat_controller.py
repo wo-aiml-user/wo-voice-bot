@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Request, Depends
 from app.config import Settings, get_settings
 from app.utils.response import success_response
 from app.api.chat.models.chat_model import ChatRequest
@@ -24,6 +24,6 @@ async def handle_chat(
         settings=settings
     )
     
-    return success_response(data=result)
+    return await success_response(data=result)
 
 

@@ -105,13 +105,3 @@ async def websocket_voice_endpoint(
         await session.close()
         if session_id in active_sessions:
             del active_sessions[session_id]
-
-
-async def get_active_session(session_id: str) -> VoiceAgentSession | None:
-    """Get an active voice session by ID."""
-    return active_sessions.get(session_id)
-
-
-async def get_active_session_count() -> int:
-    """Get the number of active voice sessions."""
-    return len(active_sessions)

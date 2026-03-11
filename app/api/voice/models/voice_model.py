@@ -2,7 +2,7 @@
 Pydantic models for Voice Agent configuration.
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 
 class AudioInputConfig(BaseModel):

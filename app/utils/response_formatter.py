@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Set
 from .json_parser import parse_json_response
 
 
-def format_page_number(page_number: Any) -> Any:
+async def format_page_number(page_number: Any) -> Any:
     """
     Extract the numerical value from a page number string.
     """
@@ -21,7 +21,7 @@ def format_page_number(page_number: Any) -> Any:
             return int(match.group(1))
     return page_number
 
-def format_rag_response(response: Dict, user_query: str) -> Dict:
+async def format_rag_response(response: Dict, user_query: str) -> Dict:
     """
     Process and format the RAG response with metadata.
     """
@@ -39,7 +39,7 @@ def format_rag_response(response: Dict, user_query: str) -> Dict:
             response_string
         )
         
-        json_response = parse_json_response(cleaned)
+        json_response = await parse_json_response(cleaned)
         # Determine if context was utilized based on tool usage
         is_retrieval = "retrieve_documents" in tool_names
 
@@ -128,7 +128,7 @@ def format_rag_response(response: Dict, user_query: str) -> Dict:
                 file_name = metadata.get("file_name", "Unknown File")
                 meta_item = {
                     "text": context_item.page_content,
-                    "page": format_page_number(metadata.get("page_number", "")),
+                    "page": await format_page_number(metadata.get("page_number", "")),
                     "file_id": metadata.get("file_id", ""),
                     "file_name": file_name,
                     "title": file_name,

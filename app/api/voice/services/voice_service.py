@@ -8,7 +8,7 @@ from app.config import Settings
 from tools.tools_schema import retrieval_tool
 from app.RAG.prompt import get_voice_prompt
 
-def get_function_definitions() -> List[Dict]:
+async def get_function_definitions() -> List[Dict]:
     """
     Get the function definitions in OpenAI format.
     Returns the same tools used in the chat RAG pipeline.
@@ -30,11 +30,11 @@ async def get_voice_agent_settings(settings: Settings) -> Dict:
     logger.info("[VOICE_SERVICE] Building voice agent settings")
     
     # Get function definitions in Deepgram format
-    function_definitions = get_function_definitions()
+    function_definitions = await get_function_definitions()
     logger.info(f"[VOICE_SERVICE] Loaded {len(function_definitions)} function definitions (OpenAI/Gemini format)")
     
     # Get voice-optimized prompt
-    voice_prompt = get_voice_prompt()
+    voice_prompt = await get_voice_prompt()
     logger.info("[VOICE_SERVICE] Loaded voice-optimized prompt")
     
     return {
