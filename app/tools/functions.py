@@ -19,16 +19,8 @@ class Document:
         self.metadata = metadata
 
 
-def _preview_text(text: str, limit: int = 240) -> str:
-    """Compact single-line preview for chunk logging."""
-    if not text:
-        return ""
-    one_line = " ".join(text.split())
-    return one_line[:limit] + ("..." if len(one_line) > limit else "")
 
-
-
-async def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 5) -> tuple[List[Document], Dict[str, int]]:
+async def retrieve_documents(query: str, collection_name: Optional[str] = None, top_k: int = 5) -> tuple[List[Document], Dict[str, int]]:
     """
     Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo.
     """
@@ -124,27 +116,21 @@ async def execute_tool(function_name: str, function_args: Dict, collection_name:
                 return "Error: Collection name required for document retrieval", [], token_usage
             
             query = function_args.get("query", "")
-            file_ids = function_args.get("file_ids")
             
             logger.info(f"[TOOL_EXEC] Retrieving documents for query: '{query}'")
             
             documents, retrieval_tokens = await retrieve_documents(
                 query=query,
-                collection_name=collection_name,
-                file_ids=file_ids
+                collection_name=collection_name
             )
             
             token_usage.update(retrieval_tokens)
-
-            for idx, doc in enumerate(documents, start=1):
-                chunk_text = doc.page_content or ""
-                logger.info(
-                    f"[TOOL_EXEC] Chunk {idx}/{len(documents)} | "
-                    f"score={doc.metadata.get('score', 0.0):.4f} | "
-                    f"source={doc.metadata.get('file_name', 'Unknown')} | "
-                    f"chars={len(chunk_text)}"
-                )
-                logger.info(f"[TOOL_EXEC] Chunk preview {idx}: {_preview_text(chunk_text)}")
+            
+            # Detailed logging of retrieved chunks
+            for i, doc in enumerate(documents):
+                logger.info(f"[TOOL_EXEC] Chunk {i+1} | Score: {doc.metadata.get('score', 0.0):.4f} | Source: {doc.metadata.get('file_name', 'Unknown')}")
+                logger.info(f"[TOOL_EXEC] Content:\n{doc.page_content}")
+                logger.info("-" * 50)
             
             result = await format_documents_for_llm(documents)
             logger.info(f"[TOOL_EXEC] Retrieved {len(documents)} documents | tokens={retrieval_tokens}")

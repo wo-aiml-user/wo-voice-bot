@@ -14,3 +14,4 @@ uploads/
 .qoder
 rag_worker.lock
 node_modules
+/data_scraping_pipeline
