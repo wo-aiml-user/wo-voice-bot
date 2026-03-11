@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  tika:
+    image: apache/tika:latest-full  # You can choose the version you need
+    container_name: tika-server
+    ports:
+      - "9998:9998"  # Default Tika server port
+    restart: unless-stopped
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi-app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - tika
+    environment:
+      - TIKA_SERVER_ENDPOINT=http://tika:9998
+      - AWS_REGION=${AWS_REGION}
+      - AWS_SECRET_NAME=${AWS_SECRET_NAME}
+    restart: unless-stopped
