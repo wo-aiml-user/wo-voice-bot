@@ -3,11 +3,11 @@ import json
 from asyncio import Lock
 from loguru import logger
 from datetime import datetime
-from app.data_scraping_pipeline.config import settings
-from app.data_scraping_pipeline.scraping.sitemap_extractor import extract_sitemap
-from app.data_scraping_pipeline.scraping.pagecontent_extractor import extract_and_save_contents
-from app.data_scraping_pipeline.indexing.indexer import run_indexer
-from app.data_scraping_pipeline.indexing.vector_store import (
+from data_scraping_pipeline.config import settings
+from data_scraping_pipeline.scraping.sitemap_extractor import extract_sitemap
+from data_scraping_pipeline.scraping.pagecontent_extractor import extract_and_save_contents
+from data_scraping_pipeline.indexing.indexer import run_indexer
+from data_scraping_pipeline.indexing.vector_store import (
     connect_to_mongodb, 
     disconnect_from_mongodb,
     create_vector_search_index

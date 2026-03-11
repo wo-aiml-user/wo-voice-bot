@@ -5,7 +5,7 @@ Settings for scraping, indexing, and MongoDB write operations.
 import os
 from functools import lru_cache
 from typing import Optional
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -32,11 +32,12 @@ class Settings(BaseSettings):
 
     # Environment
     ENVIRONMENT: str = "development"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-        extra = "ignore"
+
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 @lru_cache()

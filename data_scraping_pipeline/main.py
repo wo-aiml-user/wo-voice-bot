@@ -6,12 +6,12 @@ including scheduler configuration for automated daily runs.
 """
 import asyncio
 from loguru import logger
-from app.data_scraping_pipeline.config import settings
+from data_scraping_pipeline.config import settings
 from contextlib import asynccontextmanager
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from app.data_scraping_pipeline.logger import setup_logger
-from app.data_scraping_pipeline.scraping.pipeline import run_pipeline
+from data_scraping_pipeline.logger import setup_logger
+from data_scraping_pipeline.scraping.pipeline import run_pipeline
 
 # Initialize scheduler
 scheduler = AsyncIOScheduler()

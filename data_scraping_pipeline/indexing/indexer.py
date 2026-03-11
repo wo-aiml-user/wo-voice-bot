@@ -10,9 +10,9 @@ import json
 from loguru import logger
 from datetime import datetime
 from typing import Dict, Any, Optional
-from app.data_scraping_pipeline.config import settings
-from app.data_scraping_pipeline.indexing.chunking import process_markdown_documents
-from app.data_scraping_pipeline.indexing.vector_store import (
+from data_scraping_pipeline.config import settings
+from data_scraping_pipeline.indexing.chunking import process_markdown_documents
+from data_scraping_pipeline.indexing.vector_store import (
     connect_to_mongodb,
     disconnect_from_mongodb,
     ensure_collection, 

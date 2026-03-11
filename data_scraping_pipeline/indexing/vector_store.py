@@ -8,8 +8,8 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, OperationFailure
 from pymongo.operations import SearchIndexModel
 from langchain_mongodb import MongoDBAtlasVectorSearch
-from app.data_scraping_pipeline.config import settings
-from app.data_scraping_pipeline.indexing.embedding import CustomVoyageAIEmbeddings
+from data_scraping_pipeline.config import settings
+from data_scraping_pipeline.indexing.embedding import CustomVoyageAIEmbeddings
 
 # Global MongoDB client
 _mongo_client: Optional[MongoClient] = None

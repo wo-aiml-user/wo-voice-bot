@@ -6,14 +6,14 @@ import sys
 import os
 
 # Ensure project root is in sys.path for imports
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 import asyncio
-from app.data_scraping_pipeline.config import settings
-from app.data_scraping_pipeline.indexing.vector_store import connect_to_mongodb, disconnect_from_mongodb
-from app.data_scraping_pipeline.scraping.pipeline import run_pipeline
+from data_scraping_pipeline.config import settings
+from data_scraping_pipeline.indexing.vector_store import connect_to_mongodb, disconnect_from_mongodb
+from data_scraping_pipeline.scraping.pipeline import run_pipeline
 
 async def main():
     print("🔌 Connecting to MongoDB Atlas...")

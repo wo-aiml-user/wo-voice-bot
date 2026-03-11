@@ -18,8 +18,8 @@ from crawl4ai import (
     MemoryAdaptiveDispatcher,
 )
 
-from app.data_scraping_pipeline.scraping.cleaner import clean_content
-from app.data_scraping_pipeline.scraping.sitemap_extractor import get_latest_two_sitemap_paths, compare_sitemaps, SitemapProcessingError
+from data_scraping_pipeline.scraping.cleaner import clean_content
+from data_scraping_pipeline.scraping.sitemap_extractor import get_latest_two_sitemap_paths, compare_sitemaps, SitemapProcessingError
 
 #-------------------------------------------------------------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------------------------------------------------------------
