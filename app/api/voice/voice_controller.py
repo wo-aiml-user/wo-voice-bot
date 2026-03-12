@@ -5,6 +5,7 @@ Handles WebSocket connections for real-time voice interactions.
 import json
 import base64
 import asyncio
+import binascii
 from typing import Dict
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -84,7 +85,15 @@ async def websocket_voice_endpoint(
                 elif msg_type == "audio_chunk":
                     # Decode and forward audio to Deepgram Voice Agent
                     if "audio_data" in data:
-                        audio_bytes = base64.b64decode(data["audio_data"])
+                        try:
+                            audio_bytes = base64.b64decode(data["audio_data"])
+                        except (binascii.Error, ValueError) as e:
+                            logger.warning(f"[{session_id}] Invalid base64 audio_chunk: {e}")
+                            await session.client_ws.send_text(json.dumps({
+                                "type": "error",
+                                "message": "Invalid audio chunk encoding"
+                            }))
+                            continue
                         await session.forward_audio_to_agent(audio_bytes)
                 
                 elif msg_type == "end_session":

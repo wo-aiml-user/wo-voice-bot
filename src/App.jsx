@@ -142,7 +142,7 @@ function App() {
       return;
     }
 
-    const wsUrl = `${WS_URL}/api/ws/voice/${sessionIdRef.current}`;
+    const wsUrl = `${WS_URL}/api/voice/ws/${sessionIdRef.current}`;
     console.log(`[WS] 🔌 Connecting to: ${wsUrl}`);
     const ws = new WebSocket(wsUrl);
 

@@ -46,9 +46,11 @@ class Settings(BaseSettings):
     # Environment-specific settings (for dynamic behavior)
     ENVIRONMENT: str = "development"  # Default to development
 
-    class Config:
-        env_file = ".env"  # Single .env file for all environments
-        case_sensitive = True
+    model_config = {
+        "env_file": ".env",
+        "case_sensitive": True,
+        "extra": "ignore"
+    }
 
 
 @lru_cache()

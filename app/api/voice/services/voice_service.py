@@ -10,10 +10,37 @@ from app.RAG.prompt import get_voice_prompt
 
 async def get_function_definitions() -> List[Dict]:
     """
-    Get the function definitions in OpenAI format.
-    Returns the same tools used in the chat RAG pipeline.
+    Return Deepgram-compatible function definitions.
+    retrieval_tool is in Deepgram flat format (name, description, parameters).
     """
-    return [retrieval_tool]
+    functions = []
+    for tool in [retrieval_tool]:
+        if not isinstance(tool, dict):
+            logger.warning(f"[VOICE_SERVICE] Skipping invalid function schema (non-object): {tool}")
+            continue
+
+        # Keep only keys documented by Deepgram for function definitions.
+        sanitized = {
+            "name": tool.get("name"),
+            "description": tool.get("description", ""),
+            "parameters": tool.get("parameters"),
+        }
+        if tool.get("endpoint"):
+            sanitized["endpoint"] = tool["endpoint"]
+
+        if not sanitized["name"] or not sanitized["parameters"]:
+            logger.warning(f"[VOICE_SERVICE] Skipping invalid function schema: {tool}")
+            continue
+
+        functions.append(sanitized)
+
+    logger.info(
+        f"[VOICE_SERVICE] Function definitions prepared | count={len(functions)} "
+        f"names={[f.get('name') for f in functions]} "
+        f"server_side={[bool(f.get('endpoint')) for f in functions]}"
+    )
+    return functions
+
 
 
 async def get_voice_agent_settings(settings: Settings) -> Dict:
@@ -31,12 +58,12 @@ async def get_voice_agent_settings(settings: Settings) -> Dict:
     
     # Get function definitions in Deepgram format
     function_definitions = await get_function_definitions()
-    logger.info(f"[VOICE_SERVICE] Loaded {len(function_definitions)} function definitions (OpenAI/Gemini format)")
+    logger.info(f"[VOICE_SERVICE] Loaded {function_definitions} function definitions")
     
     # Get voice-optimized prompt
     voice_prompt = await get_voice_prompt()
     logger.info("[VOICE_SERVICE] Loaded voice-optimized prompt")
-    
+
     return {
         "type": "Settings",
         "audio": {
@@ -62,7 +89,7 @@ async def get_voice_agent_settings(settings: Settings) -> Dict:
                 "provider": {
                     "type": "open_ai",
                     "model": settings.GEMINI_MODEL,
-                    "temperature": 0.4
+                    "temperature": 0.6
                 },
                 "endpoint": {
                     "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
