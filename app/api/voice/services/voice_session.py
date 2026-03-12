@@ -133,7 +133,7 @@ class VoiceAgentSession:
                 logger.info(f"[VOICE_FUNCTION] [{self.session_id}] Document retrieval: query='{query}', collection={self.settings.MONGODB_COLLECTION_NAME}")
                 
                 # Use retrieve_documents from tools/functions.py
-                documents, token_usage = retrieve_documents(
+                documents, token_usage = await retrieve_documents(
                     query=query,
                     collection_name=self.settings.MONGODB_COLLECTION_NAME,
                     file_ids=file_ids,

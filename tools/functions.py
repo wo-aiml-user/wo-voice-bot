@@ -11,6 +11,7 @@ from pymongo import MongoClient
 from app.RAG.embedding import CustomVoyageAIEmbeddings
 from app.config import settings
 from app.RAG.vector_store import ensure_collection_and_index
+import traceback
 load_dotenv()
 
 class Document:
@@ -28,11 +29,12 @@ def _preview_text(text: str, limit: int = 240) -> str:
 
 
 
-async def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 5) -> tuple[List[Document], Dict[str, int]]:
+async def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 12, top_n: int = 8) -> tuple[List[Document], Dict[str, int]]:
     """
-    Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo.
+    Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo,
+    then rerank them using Voyage AI Reranker.
     """
-    token_usage = {"embedding_tokens": 0, "retrieval_tokens": 0}
+    token_usage = {"embedding_tokens": 0, "rerank_tokens": 0}
     
     # Connect to MongoDB
     mongo_uri = settings.MONGODB_URI
@@ -80,23 +82,53 @@ async def retrieve_documents(query: str, collection_name: Optional[str] = None, 
             }
         ]
         
-        logger.info(f"[RAG] Executing $vectorSearch on {db_name}.{col_name}")
-        results = collection.aggregate(pipeline)
+        logger.info(f"[RAG] Executing $vectorSearch on {db_name}.{col_name} (top_k={top_k})")
+        results = list(collection.aggregate(pipeline))
         
-        documents = []
+        if not results:
+            client.close()
+            return [], token_usage
+
+        # Prepare for reranking
+        documents_to_rerank = []
+        original_docs = []
         for res in results:
-            page_content = res.get("text", "")
-            metadata = {
-                "file_name": res.get("file_name", "Unknown"),
-                "score": res.get("score", 0.0)
-            }
-            documents.append(Document(page_content=page_content, metadata=metadata))
+            text = res.get("text", "")
+            documents_to_rerank.append(text)
+            original_docs.append(Document(
+                page_content=text,
+                metadata={
+                    "file_name": res.get("file_name", "Unknown"),
+                    "score": res.get("score", 0.0)
+                }
+            ))
+
+        logger.info(f"[RAG] Reranking {len(documents_to_rerank)} documents to top_n={top_n}")
+        rerank_model = settings.VOYAGE_MODELS.get('reranker', 'rerank-2')
+        rerank_result = embedder.rerank(
+            query=query,
+            documents=documents_to_rerank,
+            model=rerank_model,
+            top_k=top_n
+        )
+        
+        token_usage["rerank_tokens"] = embedder._rerank_tokens
+        
+        # Build final document list based on reranker results
+        final_documents = []
+        for r in rerank_result.results:
+            doc_idx = r.index
+            doc = original_docs[doc_idx]
+            # Update metadata with reranker score
+            doc.metadata["rerank_score"] = r.relevance_score
+            final_documents.append(doc)
             
         client.close()
-        return documents, token_usage
+        return final_documents, token_usage
         
     except Exception as e:
-        logger.error(f"[RAG] Document retrieval failed: {e}")
+        logger.error(f"[RAG] Document retrieval and reranking failed: {e}")
+        logger.error(traceback.format_exc())
         return [], token_usage
 
 async def format_documents_for_llm(documents: List[Document]) -> str:

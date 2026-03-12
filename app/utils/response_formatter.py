@@ -74,16 +74,8 @@ async def format_rag_response(response: Dict, user_query: str) -> Dict:
         
         # If no explicit refs but tools used, check if we should fallback
         if not processed_refs and tool_names:
-             # For retrieval, we did regex fallback.
-             # For other tools (search, weather), if no refs, we typically want to show what was used.
-             if is_retrieval:
-                 # Logic already handled or we accept empty if regex failed? 
-                 # Let's retry regex strictly on response string just in case
-                 found_refs = re.findall(r'Context\s+(\d+)', formatted_response["response"], re.IGNORECASE)
-                 if found_refs:
-                     processed_refs = [int(r)-1 for r in found_refs]
-             else:
-                 # For search/weather, include all items by default if no specific citations
+             # For search/weather, include all items by default if no specific citations
+             if not is_retrieval:
                  processed_refs = list(range(len(context_list)))
 
         if not context_list:
@@ -103,12 +95,6 @@ async def format_rag_response(response: Dict, user_query: str) -> Dict:
              for ref in doc_refs:
                  if str(ref).strip().isdigit():
                      final_indices.append(int(ref) - 1)
-        
-        # Case 2: Regex Falback (Context 1 -> 0)
-        elif is_retrieval:
-             found_refs = re.findall(r'Context\s+(\d+)', formatted_response["response"], re.IGNORECASE)
-             for r in found_refs:
-                 final_indices.append(int(r) - 1)
         
         # Case 3: Non-retrieval fallback (All items)
         elif not is_retrieval and tool_names:
