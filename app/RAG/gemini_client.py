@@ -12,9 +12,17 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 
 @dataclass
+class FunctionCall:
+    """Represents a function call in the response."""
+    name: str
+    arguments: str
+
+@dataclass
 class Message:
     """Represents a message in the response."""
     content: Optional[str]
+    function_call: Optional[FunctionCall] = None
+    role: str = "assistant"
 
 
 @dataclass
@@ -84,11 +92,44 @@ class GeminiClient:
                     parts=[types.Part.from_text(text=content)]
                 ))
             elif role == "assistant":
-                if content:
+                if msg.get("function_call"):
+                    fc = msg.get("function_call")
+                    import json
+                    args = json.loads(fc.get("arguments", "{}")) if isinstance(fc.get("arguments"), str) else fc.get("arguments", {})
+                    
+                    parts = []
+                    if content:
+                        parts.append(types.Part.from_text(text=content))
+                    parts.append(types.Part.from_function_call(name=fc["name"], args=args))
+                    
+                    contents.append(types.Content(
+                        role="model",
+                        parts=parts
+                    ))
+                elif content:
                     contents.append(types.Content(
                         role="model",
                         parts=[types.Part.from_text(text=content)]
                     ))
+            elif role == "tool" or role == "function":
+                func_name = msg.get("name", "")
+                func_content = content
+                if isinstance(func_content, str):
+                    try:
+                        import json
+                        parsed_content = json.loads(func_content)
+                        if isinstance(parsed_content, dict):
+                            func_content = parsed_content
+                    except Exception:
+                        pass
+                
+                if not isinstance(func_content, dict):
+                    func_content = {"result": func_content}
+
+                contents.append(types.Content(
+                    role="user",
+                    parts=[types.Part.from_function_response(name=func_name, response=func_content)]
+                ))
         
         return system_instruction, contents
     
@@ -100,7 +141,8 @@ class GeminiClient:
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.6,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        tools: Optional[List[Dict[str, Any]]] = None
     ) -> ChatCompletionResponse:
         """
         Create a chat completion.
@@ -110,6 +152,7 @@ class GeminiClient:
             messages: List of message dictionaries (OpenAI format)
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            tools: List of tool schemas in dict format
             
         Returns:
             OpenAI-compatible ChatCompletionResponse
@@ -128,6 +171,18 @@ class GeminiClient:
             
             if system_instruction:
                 config_kwargs["system_instruction"] = system_instruction
+                
+            if tools:
+                gemini_tools = []
+                for tool in tools:
+                    f = tool.get("function", tool)
+                    func_decl = types.FunctionDeclaration(
+                        name=f["name"],
+                        description=f.get("description", ""),
+                        parameters=f.get("parameters")
+                    )
+                    gemini_tools.append(types.Tool(function_declarations=[func_decl]))
+                config_kwargs["tools"] = gemini_tools
             
             generate_config = types.GenerateContentConfig(**config_kwargs)
             
@@ -156,6 +211,7 @@ class GeminiClient:
             OpenAI-compatible ChatCompletionResponse
         """
         content = None
+        function_call = None
         
         # Extract content from response
         if response.candidates and response.candidates[0].content:
@@ -163,7 +219,18 @@ class GeminiClient:
             text_parts = []
             
             for part in parts:
-                if hasattr(part, 'text') and part.text:
+                if hasattr(part, 'function_call') and part.function_call:
+                    import json
+                    args = part.function_call.args
+                    if hasattr(args, "items"):
+                        args_json = json.dumps(dict(args))
+                    else:
+                        args_json = json.dumps(args)
+                    function_call = FunctionCall(
+                        name=part.function_call.name,
+                        arguments=args_json
+                    )
+                elif hasattr(part, 'text') and part.text:
                     text_parts.append(part.text)
             
             if text_parts:
@@ -179,7 +246,7 @@ class GeminiClient:
             )
         
         return ChatCompletionResponse(
-            choices=[Choice(message=Message(content=content))],
+            choices=[Choice(message=Message(content=content, function_call=function_call))],
             usage=usage
         )
     

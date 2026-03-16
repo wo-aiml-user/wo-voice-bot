@@ -68,10 +68,10 @@ class VoiceAgentSession:
                 return False
             
             # Log keys securely for debugging
-            logger.info(f"[{self.session_id}] Connecting to Deepgram... Key: {deepgram_api_key[:4]}...")
+            logger.info(f"[{self.session_id}] Connecting to Deepgram...")
             gemini_key = self.settings.GEMINI_API_KEY
             if gemini_key:
-                logger.info(f"[{self.session_id}] Gemini Key loaded: {gemini_key[:4]}...")
+                logger.info(f"[{self.session_id}] Gemini Key loaded")
             else:
                 logger.warning(f"[{self.session_id}] Gemini Key NOT loaded")
 
@@ -339,30 +339,28 @@ class VoiceAgentSession:
         
         elif msg_type == "FunctionCallRequest":
             # Deepgram is requesting us to execute a function
-            # This happens when client_side: true
-            functions = data.get("functions", [])
+            # Handle both single function format and array format
+            func_name_direct = data.get("function_name") or data.get("name")
+            if func_name_direct:
+                functions = [data]
+            else:
+                functions = data.get("functions", [])
+                
             logger.info(
                 f"[{self.session_id}] Agent | FunctionCallRequest count={len(functions)} "
                 f"payload={self._log_preview(data)}"
             )
             
             for idx, func in enumerate(functions, start=1):
-                func_id = func.get("id", "")
-                func_name = func.get("name", "")
+                func_id = func.get("function_id") or func.get("id", "")
+                func_name = func.get("function_name") or func.get("name", "")
                 func_args_str = func.get("arguments", "{}")
-                client_side = bool(func.get("client_side", False))
+                
                 logger.info(
                     f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] "
                     f"id={func_id or '<missing>'} name={func_name or '<missing>'} "
-                    f"client_side={client_side} raw_arguments={self._log_preview(func_args_str)}"
+                    f"raw_arguments={self._log_preview(func_args_str)}"
                 )
-
-                if not client_side:
-                    logger.info(
-                        f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] skipped "
-                        f"(server-side function per Deepgram request)"
-                    )
-                    continue
                 
                 # Parse arguments
                 try:
