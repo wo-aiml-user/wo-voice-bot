@@ -34,9 +34,6 @@ async def format_rag_response(response: Dict, user_query: str) -> Dict:
             "token_usage": response.get("token_usage", {})
         }
 
-        # Handle conversation title
-        if "title" in json_response:
-            formatted_response["title"] = json_response["title"]
 
         # If no tool used, return early with empty metadata
         if not tool_names:
