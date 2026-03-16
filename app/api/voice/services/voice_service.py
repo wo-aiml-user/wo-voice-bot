@@ -42,7 +42,6 @@ async def get_function_definitions() -> List[Dict]:
     return functions
 
 
-
 async def get_voice_agent_settings(settings: Settings) -> Dict:
     """
     Configure Deepgram Voice Agent with Gemini as custom LLM.
@@ -63,6 +62,9 @@ async def get_voice_agent_settings(settings: Settings) -> Dict:
     # Get voice-optimized prompt
     voice_prompt = await get_voice_prompt()
     logger.info("[VOICE_SERVICE] Loaded voice-optimized prompt")
+
+    # Use model name from settings directly
+    model_name = settings.GEMINI_MODEL
 
     return {
         "type": "Settings",
@@ -87,14 +89,12 @@ async def get_voice_agent_settings(settings: Settings) -> Dict:
             },
             "think": {
                 "provider": {
-                    "type": "open_ai",
-                    "model": settings.GEMINI_MODEL,
-                    "temperature": 0.6
+                    "type": "google"
                 },
                 "endpoint": {
-                    "url": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                    "url": f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:streamGenerateContent?alt=sse",
                     "headers": {
-                        "Authorization": f"Bearer {settings.GEMINI_API_KEY}"
+                        "x-goog-api-key": settings.GEMINI_API_KEY
                     }
                 },
                 "prompt": voice_prompt,

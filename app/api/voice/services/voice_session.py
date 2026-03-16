@@ -341,10 +341,17 @@ class VoiceAgentSession:
                     "text": content
                 }))
         
-        elif msg_type == "FunctionCallRequest":
-            # Deepgram is requesting us to execute a function
-            # This happens when client_side: true
+        elif msg_type == "FunctionCallRequest":            
+            # Handle both list format and flat object format for robustness
             functions = data.get("functions", [])
+            if not functions and ("function_name" in data or "name" in data):
+                functions = [{
+                    "id": data.get("function_id") or data.get("id", ""),
+                    "name": data.get("function_name") or data.get("name", ""),
+                    "arguments": data.get("arguments", "{}"),
+                    "client_side": True
+                }]
+                
             logger.info(
                 f"[{self.session_id}] Agent | FunctionCallRequest count={len(functions)} "
                 f"payload={self._log_preview(data)}"
@@ -354,10 +361,10 @@ class VoiceAgentSession:
                 func_id = func.get("id", "")
                 func_name = func.get("name", "")
                 func_args_str = func.get("arguments", "{}")
-                client_side = bool(func.get("client_side", False))
+                client_side = bool(func.get("client_side", True))
                 logger.info(
-                    f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] "
-                    f"id={func_id or '<missing>'} name={func_name or '<missing>'} "
+                    f"[{self.session_id}] TRIGGERED FUNCTION CALL EVENT: {func_name} | "
+                    f"id={func_id or '<missing>'} "
                     f"client_side={client_side} raw_arguments={self._log_preview(func_args_str)}"
                 )
 
@@ -389,7 +396,7 @@ class VoiceAgentSession:
                 exec_ms = int((time.perf_counter() - exec_start) * 1000)
                 
                 logger.info(
-                    f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] result "
+                    f"[{self.session_id}] FUNCTION CALL RESULT: {result} "
                     f"(duration={exec_ms}ms): {self._log_preview(result)}"
                 )
                 
