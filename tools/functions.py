@@ -29,7 +29,7 @@ def _preview_text(text: str, limit: int = 240) -> str:
 
 
 
-async def retrieve_documents(query: str, collection_name: Optional[str] = None, file_ids: Optional[List[str]] = None, top_k: int = 12, top_n: int = 8) -> tuple[List[Document], Dict[str, int]]:
+async def retrieve_documents(query: str, collection_name: Optional[str] = None, top_k: int = 8, top_n: int = 5) -> tuple[List[Document], Dict[str, int]]:
     """
     Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo,
     then rerank them using Voyage AI Reranker.
@@ -156,14 +156,12 @@ async def execute_tool(function_name: str, function_args: Dict, collection_name:
                 return "Error: Collection name required for document retrieval", [], token_usage
             
             query = function_args.get("query", "")
-            file_ids = function_args.get("file_ids")
             
             logger.info(f"[TOOL_EXEC] Retrieving documents for query: '{query}'")
             
             documents, retrieval_tokens = await retrieve_documents(
                 query=query,
                 collection_name=collection_name,
-                file_ids=file_ids
             )
             
             token_usage.update(retrieval_tokens)

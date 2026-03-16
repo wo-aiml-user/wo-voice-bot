@@ -194,7 +194,6 @@ class VoiceAgentSession:
         try:
             if function_name == "retrieve_documents":
                 query = arguments.get("query", "")
-                file_ids = arguments.get("file_ids", None)
                 
                 logger.info(f"[VOICE_FUNCTION] [{self.session_id}] Document retrieval: query='{query}', collection={self.settings.MONGODB_COLLECTION_NAME}")
                 
@@ -202,8 +201,8 @@ class VoiceAgentSession:
                 documents, token_usage = await retrieve_documents(
                     query=query,
                     collection_name=self.settings.MONGODB_COLLECTION_NAME,
-                    file_ids=file_ids,
-                    top_k=5  # Fewer docs for voice to keep response concise
+                    top_k=8,
+                    top_n=5
                 )
                 
                 elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -213,7 +212,7 @@ class VoiceAgentSession:
                     # Format documents for voice response
                     doc_summaries = []
                     for i, doc in enumerate(documents[:3]):  # Top 3 for voice
-                        content_preview = doc.page_content[:200].replace('\n', ' ')
+                        content_preview = doc.page_content
                         doc_summaries.append({
                             "index": i + 1,
                             "file": doc.metadata.get("file_name", "Unknown"),
