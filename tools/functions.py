@@ -76,6 +76,10 @@ async def retrieve_documents(query: str, collection_name: Optional[str] = None, 
             {
                 "$project": {
                     "text": 1,
+                    "webpage_url": 1,
+                    "chunk_id": 1,
+                    "chunk_number": 1,
+                    "chunk_size": 1,
                     "file_name": 1,
                     "score": {"$meta": "vectorSearchScore"}
                 }
@@ -95,12 +99,21 @@ async def retrieve_documents(query: str, collection_name: Optional[str] = None, 
         for res in results:
             text = res.get("text", "")
             documents_to_rerank.append(text)
+            
+            # Map available fields to metadata, handling root-level storage
+            doc_metadata = {
+                "webpage_url": res.get("webpage_url", ""),
+                "chunk_id": res.get("chunk_id") or res.get("chunk_number", ""),
+                "chunk_size": res.get("chunk_size", 0),
+                "score": res.get("score", 0.0)
+            }
+            
+            # Set file_name/title with appropriate fallback
+            doc_metadata["file_name"] = res.get("file_name") or res.get("webpage_url") or "Unknown"
+            
             original_docs.append(Document(
                 page_content=text,
-                metadata={
-                    "file_name": res.get("file_name", "Unknown"),
-                    "score": res.get("score", 0.0)
-                }
+                metadata=doc_metadata
             ))
 
         logger.info(f"[RAG] Reranking {len(documents_to_rerank)} documents to top_n={top_n}")
