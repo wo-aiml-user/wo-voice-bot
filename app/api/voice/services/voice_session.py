@@ -16,6 +16,7 @@ from app.config import Settings
 from app.api.voice.services.voice_service import get_voice_agent_settings
 from tools.functions import retrieve_documents
 import traceback
+from starlette.concurrency import run_in_threadpool
 
 
 
@@ -315,12 +316,15 @@ class VoiceAgentSession:
             
             # Save raw transcript directly to our database
             try:
-                self.user_data_collection.insert_one({
-                    "session_id": self.session_id,
-                    "role": role,
-                    "content": content,
-                    "timestamp": datetime.datetime.now(datetime.timezone.utc)
-                })
+                await run_in_threadpool(
+                    self.user_data_collection.insert_one,
+                    {
+                        "session_id": self.session_id,
+                        "role": role,
+                        "content": content,
+                        "timestamp": datetime.datetime.now(datetime.timezone.utc)
+                    }
+                )
             except Exception as e:
                 logger.error(f"[{self.session_id}] Failed to save conversation text to MongoDB: {e}")
             
@@ -339,28 +343,30 @@ class VoiceAgentSession:
         
         elif msg_type == "FunctionCallRequest":
             # Deepgram is requesting us to execute a function
-            # Handle both single function format and array format
-            func_name_direct = data.get("function_name") or data.get("name")
-            if func_name_direct:
-                functions = [data]
-            else:
-                functions = data.get("functions", [])
-                
+            # This happens when client_side: true
+            functions = data.get("functions", [])
             logger.info(
                 f"[{self.session_id}] Agent | FunctionCallRequest count={len(functions)} "
                 f"payload={self._log_preview(data)}"
             )
             
             for idx, func in enumerate(functions, start=1):
-                func_id = func.get("function_id") or func.get("id", "")
-                func_name = func.get("function_name") or func.get("name", "")
+                func_id = func.get("id", "")
+                func_name = func.get("name", "")
                 func_args_str = func.get("arguments", "{}")
-                
+                client_side = bool(func.get("client_side", False))
                 logger.info(
                     f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] "
                     f"id={func_id or '<missing>'} name={func_name or '<missing>'} "
-                    f"raw_arguments={self._log_preview(func_args_str)}"
+                    f"client_side={client_side} raw_arguments={self._log_preview(func_args_str)}"
                 )
+
+                if not client_side:
+                    logger.info(
+                        f"[{self.session_id}] Agent | FunctionCallRequest[{idx}] skipped "
+                        f"(server-side function per Deepgram request)"
+                    )
+                    continue
                 
                 # Parse arguments
                 try:

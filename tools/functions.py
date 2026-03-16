@@ -11,6 +11,7 @@ from pymongo import MongoClient
 from app.RAG.embedding import CustomVoyageAIEmbeddings
 from app.config import settings
 from app.RAG.vector_store import ensure_collection_and_index
+from starlette.concurrency import run_in_threadpool
 import traceback
 load_dotenv()
 
@@ -29,24 +30,12 @@ def _preview_text(text: str, limit: int = 240) -> str:
 
 
 
-async def retrieve_documents(query: str, collection_name: Optional[str] = None, top_k: int = 8, top_n: int = 5) -> tuple[List[Document], Dict[str, int]]:
-    """
-    Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo,
-    then rerank them using Voyage AI Reranker.
-    """
+def _sync_retrieve_documents(query: str, col_name: str, db_name: str, index_name: str, top_k: int, top_n: int) -> tuple[List[Document], Dict[str, int]]:
+    """Synchronous core for retrieving documents."""
     token_usage = {"embedding_tokens": 0, "rerank_tokens": 0}
-    
-    # Connect to MongoDB
     mongo_uri = settings.MONGODB_URI
-    db_name = settings.MONGODB_DB_NAME
-    col_name = collection_name or settings.MONGODB_COLLECTION_NAME
-    index_name = settings.MONGODB_INDEX_NAME
     
-    if not mongo_uri:
-        logger.error("[RAG] MONGODB_URI is not set")
     try:
-        await ensure_collection_and_index(col_name)
-        
         client = MongoClient(mongo_uri)
         collection = client[db_name][col_name]
         
@@ -141,6 +130,43 @@ async def retrieve_documents(query: str, collection_name: Optional[str] = None, 
         
     except Exception as e:
         logger.error(f"[RAG] Document retrieval and reranking failed: {e}")
+        logger.error(traceback.format_exc())
+        return [], token_usage
+
+async def retrieve_documents(query: str, collection_name: Optional[str] = None, top_k: int = 8, top_n: int = 5) -> tuple[List[Document], Dict[str, int]]:
+    """
+    Retrieve documents from MongoDB Atlas Vector Search using Voyage AI and pymongo,
+    then rerank them using Voyage AI Reranker.
+    Executes the sync retrieval code in a separate thread.
+    """
+    token_usage = {"embedding_tokens": 0, "rerank_tokens": 0}
+    
+    # Connect to MongoDB
+    mongo_uri = settings.MONGODB_URI
+    db_name = settings.MONGODB_DB_NAME
+    col_name = collection_name or settings.MONGODB_COLLECTION_NAME
+    index_name = settings.MONGODB_INDEX_NAME
+    
+    if not mongo_uri:
+        logger.error("[RAG] MONGODB_URI is not set")
+        return [], token_usage
+        
+    try:
+        await ensure_collection_and_index(col_name)
+        
+        # Run the synchronous parts in a threadpool
+        return await run_in_threadpool(
+            _sync_retrieve_documents, 
+            query, 
+            col_name, 
+            db_name, 
+            index_name, 
+            top_k, 
+            top_n
+        )
+        
+    except Exception as e:
+        logger.error(f"[RAG] Threadpool dispatch failed: {e}")
         logger.error(traceback.format_exc())
         return [], token_usage
 
